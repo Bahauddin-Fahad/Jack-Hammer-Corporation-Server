@@ -39,6 +39,14 @@ async function run() {
       res.send(tool);
     });
 
+    // Get All the Orders
+    app.get("/orders", async (req, res) => {
+      const userEmail = req.query.email;
+      const query = { email: userEmail };
+      const cursor = orderCollection.find(query);
+      const orders = await cursor.toArray();
+      res.send(orders);
+    });
     //Add a Order To DB
     app.post("/order", async (req, res) => {
       const orderDetails = req.body;
