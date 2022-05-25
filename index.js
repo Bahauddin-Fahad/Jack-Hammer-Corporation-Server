@@ -24,8 +24,8 @@ const verifyJWT = (req, res, next) => {
   if (!authHeader) {
     return req.status(401).send({ message: "Can't Authorize the Access" });
   }
-  const token = authHeader.split(" ")[1];
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+  const accessToken = authHeader.split(" ")[1];
+  jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
       return res.status(403).send({ message: "Forbidden Access" });
     }
@@ -40,6 +40,19 @@ async function run() {
     const toolCollection = client.db("jackHammerCorp").collection("tools");
     const orderCollection = client.db("jackHammerCorp").collection("orders");
     const userCollection = client.db("jackHammerCorp").collection("users");
+
+    //  Admin Verification
+    const verifyAdmin = async (req, res, next) => {
+      const userEmail = req.decoded.email;
+      const user = await userCollection.findOne({
+        email: userEmail,
+      });
+      if (user.role === "admin") {
+        next();
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    };
 
     // Getting All The tools from DB
     app.get("/tools", async (req, res) => {
@@ -58,13 +71,15 @@ async function run() {
     });
 
     // Get All the Orders
-    app.get("/orders", async (req, res) => {
+    app.get("/orders", verifyJWT, async (req, res) => {
       const userEmail = req.query.email;
+
       const query = { email: userEmail };
       const cursor = orderCollection.find(query);
       const orders = await cursor.toArray();
       res.send(orders);
     });
+
     //Add a Order To DB
     app.post("/order", async (req, res) => {
       const orderDetails = req.body;
@@ -100,6 +115,12 @@ async function run() {
       res.send(result);
     });
 
+    // Getting All the User
+    app.get("/users", verifyJWT, async (req, res) => {
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
     //Updating an specefic user
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
@@ -118,6 +139,25 @@ async function run() {
         expiresIn: "1d",
       });
       res.send({ result, accessToken });
+    });
+
+    // Add an user as an Admin
+    app.patch("/user/:email", verifyJWT, verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updatedDoc = {
+        $set: { role: "admin" },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // Getting the Admin
+    app.get("/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const user = await userCollection.findOne({ email: email });
+      const isAdmin = user.role === "admin";
+      res.send({ admin: isAdmin });
     });
   } finally {
   }
