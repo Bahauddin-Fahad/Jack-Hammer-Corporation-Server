@@ -62,6 +62,21 @@ async function run() {
       res.send(tools);
     });
 
+    // Add a new to Tool to DB
+    app.post("/tool", verifyJWT, verifyAdmin, async (req, res) => {
+      const tool = req.body;
+      const result = await toolCollection.insertOne(tool);
+      res.send(result);
+    });
+
+    //Deleting a Tool from DataBase
+    app.delete("/tool/:id", async (req, res) => {
+      const toolId = req.params.id;
+      const query = { _id: ObjectId(toolId) };
+      const result = await toolCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // Getting a single tool from db
     app.get("/purchase/:id", async (req, res) => {
       const toolId = req.params.id;
@@ -152,7 +167,7 @@ async function run() {
       res.send(result);
     });
 
-    // Getting the Admin
+    // Getting an Admin
     app.get("/admin/:email", async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email: email });
