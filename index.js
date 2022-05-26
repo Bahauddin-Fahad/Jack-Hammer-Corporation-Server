@@ -18,14 +18,14 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
-// Json Web Token Function
 const verifyJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    return req.status(401).send({ message: "Can't Authorize the Access" });
+    return res.status(401).send({ message: "Can't Authorize the Access" });
   }
-  const accessToken = authHeader.split(" ")[1];
-  jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+  const token = authHeader.split(" ")[1];
+  // console.log(token);
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
       return res.status(403).send({ message: "Forbidden Access" });
     }
@@ -33,7 +33,6 @@ const verifyJWT = (req, res, next) => {
     next();
   });
 };
-
 async function run() {
   try {
     await client.connect();
@@ -118,7 +117,7 @@ async function run() {
     });
 
     // Getting a single tool from db
-    app.get("/purchase/:id", verifyJWT, async (req, res) => {
+    app.get("/purchase/:id", async (req, res) => {
       const toolId = req.params.id;
       const query = { _id: ObjectId(toolId) };
       const tool = await toolCollection.findOne(query);
@@ -128,7 +127,6 @@ async function run() {
     // Get All the Orders
     app.get("/orders", verifyJWT, async (req, res) => {
       const userEmail = req.query.email;
-
       const query = { email: userEmail };
       const cursor = orderCollection.find(query);
       const orders = await cursor.toArray();
@@ -149,7 +147,7 @@ async function run() {
       const query = {
         name: orderDetails.name,
         email: orderDetails.email,
-        productName: orderDetails.productName,
+        toolName: orderDetails.toolName,
       };
       const exists = await orderCollection.findOne(query);
       if (exists) {
@@ -194,12 +192,6 @@ async function run() {
       };
       const result = await userCollection.updateOne(filter, updatedDoc);
       res.send(result);
-    });
-
-    app.get("/review/:email", async (req, res) => {
-      const email = req.params.email;
-      const review = await reviewCollection.findOne({ email });
-      res.send(review);
     });
 
     // Getting an Admin
