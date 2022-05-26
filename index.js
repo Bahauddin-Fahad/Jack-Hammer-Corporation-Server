@@ -80,6 +80,7 @@ async function run() {
       const updatedDoc = {
         $set: {
           paid: true,
+          status: true,
           transactionId: payment.transactionId,
         },
       };
@@ -124,6 +125,12 @@ async function run() {
       res.send(tool);
     });
 
+    app.get("/get/orders", async (req, res) => {
+      const query = {};
+      const cursor = orderCollection.find(query);
+      const orders = await cursor.toArray();
+      res.send(orders);
+    });
     // Get All the Orders
     app.get("/orders", verifyJWT, async (req, res) => {
       const userEmail = req.query.email;
@@ -142,7 +149,7 @@ async function run() {
     });
 
     //Add a Order To DB
-    app.post("/order", verifyJWT, async (req, res) => {
+    app.post("/order", async (req, res) => {
       const orderDetails = req.body;
       const query = {
         name: orderDetails.name,
@@ -156,6 +163,33 @@ async function run() {
       const result = await orderCollection.insertOne(orderDetails);
       return res.send({ success: true, result });
     });
+
+    //Shift the Order
+    app.patch("/shift/order/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          shift: true,
+        },
+      };
+
+      const updateShift = await orderCollection.updateOne(filter, updatedDoc);
+      res.send(updateShift);
+    });
+
+    //Cancel order by admin
+    app.delete(
+      "/cancel/order/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: ObjectId(id) };
+        const result = await orderCollection.deleteOne(filter);
+        res.send(result);
+      }
+    );
 
     // Getting All the User
     app.get("/users", verifyJWT, async (req, res) => {
@@ -200,6 +234,39 @@ async function run() {
       const user = await userCollection.findOne({ email: email });
       const isAdmin = user.role === "admin";
       res.send({ admin: isAdmin });
+    });
+
+    // Getting The Reviews
+    app.get("/review/:email", async (req, res) => {
+      const email = req.params.email;
+      const review = await reviewCollection.findOne({ email });
+      res.send(review);
+    });
+
+    app.put("/review/:email", async (req, res) => {
+      const email = req.params.email;
+      const review = req.body;
+      const query = {
+        email: email,
+      };
+      const exists = await reviewCollection.findOne(query);
+      if (exists) {
+        const options = { upsert: true };
+        const updatedDoc = {
+          $set: {
+            comment: review.comment,
+            rating: review.rating,
+          },
+        };
+        const result = await reviewCollection.updateOne(
+          query,
+          updatedDoc,
+          options
+        );
+        return res.send({ update: true, result });
+      }
+      const result = await reviewCollection.insertOne(review);
+      return res.send({ success: true, result });
     });
 
     // Adding payment Method
