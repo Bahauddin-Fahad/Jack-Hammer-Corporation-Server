@@ -5,7 +5,7 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const res = require("express/lib/response");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // Middleware
 app.use(cors());
@@ -38,8 +38,12 @@ async function run() {
   try {
     await client.connect();
     const toolCollection = client.db("jackHammerCorp").collection("tools");
-    const orderCollection = client.db("jackHammerCorp").collection("orders");
     const userCollection = client.db("jackHammerCorp").collection("users");
+    const reviewCollection = client.db("jackHammerCorp").collection("reviews");
+    const orderCollection = client.db("jackHammerCorp").collection("orders");
+    const paymentCollection = client
+      .db("jackHammerCorp")
+      .collection("payments");
 
     //  Admin Verification
     const verifyAdmin = async (req, res, next) => {
@@ -69,46 +73,21 @@ async function run() {
       res.send(result);
     });
 
-    //Deleting a Tool from DataBase
-    app.delete("/tool/:id", async (req, res) => {
-      const toolId = req.params.id;
-      const query = { _id: ObjectId(toolId) };
-      const result = await toolCollection.deleteOne(query);
-      res.send(result);
-    });
-
-    // Getting a single tool from db
-    app.get("/purchase/:id", async (req, res) => {
-      const toolId = req.params.id;
-      const query = { _id: ObjectId(toolId) };
-      const tool = await toolCollection.findOne(query);
-      res.send(tool);
-    });
-
-    // Get All the Orders
-    app.get("/orders", verifyJWT, async (req, res) => {
-      const userEmail = req.query.email;
-
-      const query = { email: userEmail };
-      const cursor = orderCollection.find(query);
-      const orders = await cursor.toArray();
-      res.send(orders);
-    });
-
-    //Add a Order To DB
-    app.post("/order", async (req, res) => {
-      const orderDetails = req.body;
-      const query = {
-        name: orderDetails.name,
-        email: orderDetails.email,
-        productName: orderDetails.productName,
+    // Updating Payment in Order Collection
+    app.patch("/order/:id", verifyJWT, async (req, res) => {
+      const orderId = req.params.id;
+      const payment = req.body;
+      const filter = { _id: ObjectId(orderId) };
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.transactionId,
+        },
       };
-      const exists = await orderCollection.findOne(query);
-      if (exists) {
-        return res.send({ success: false, orderDetails: exists });
-      }
-      const result = await orderCollection.insertOne(orderDetails);
-      return res.send({ success: true, result });
+      const result = await paymentCollection.insertOne(payment);
+      const updateOrder = await orderCollection.updateOne(filter, updatedDoc);
+
+      res.send(updateOrder);
     });
 
     //Update Quantity Of Tool
@@ -128,6 +107,56 @@ async function run() {
         options
       );
       res.send(result);
+    });
+
+    //Deleting a Tool from DataBase
+    app.delete("/tool/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const toolId = req.params.id;
+      const query = { _id: ObjectId(toolId) };
+      const result = await toolCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // Getting a single tool from db
+    app.get("/purchase/:id", verifyJWT, async (req, res) => {
+      const toolId = req.params.id;
+      const query = { _id: ObjectId(toolId) };
+      const tool = await toolCollection.findOne(query);
+      res.send(tool);
+    });
+
+    // Get All the Orders
+    app.get("/orders", verifyJWT, async (req, res) => {
+      const userEmail = req.query.email;
+
+      const query = { email: userEmail };
+      const cursor = orderCollection.find(query);
+      const orders = await cursor.toArray();
+      res.send(orders);
+    });
+
+    //Getting an specific Order with Id
+    app.get("/order/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const order = await orderCollection.findOne(query);
+      res.send(order);
+    });
+
+    //Add a Order To DB
+    app.post("/order", verifyJWT, async (req, res) => {
+      const orderDetails = req.body;
+      const query = {
+        name: orderDetails.name,
+        email: orderDetails.email,
+        productName: orderDetails.productName,
+      };
+      const exists = await orderCollection.findOne(query);
+      if (exists) {
+        return res.send({ success: false, orderDetails: exists });
+      }
+      const result = await orderCollection.insertOne(orderDetails);
+      return res.send({ success: true, result });
     });
 
     // Getting All the User
@@ -167,12 +196,31 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/review/:email", async (req, res) => {
+      const email = req.params.email;
+      const review = await reviewCollection.findOne({ email });
+      res.send(review);
+    });
+
     // Getting an Admin
     app.get("/admin/:email", async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email: email });
       const isAdmin = user.role === "admin";
       res.send({ admin: isAdmin });
+    });
+
+    // Adding payment Method
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const order = req.body;
+      const totalPrice = order.totalPrice;
+      const amount = totalPrice * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({ clientSecret: paymentIntent.client_secret });
     });
   } finally {
   }
