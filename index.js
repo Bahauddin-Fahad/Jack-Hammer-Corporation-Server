@@ -179,17 +179,12 @@ async function run() {
     });
 
     //Cancel order by admin
-    app.delete(
-      "/cancel/order/:id",
-      verifyJWT,
-      verifyAdmin,
-      async (req, res) => {
-        const id = req.params.id;
-        const filter = { _id: ObjectId(id) };
-        const result = await orderCollection.deleteOne(filter);
-        res.send(result);
-      }
-    );
+    app.delete("/cancel/order/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await orderCollection.deleteOne(filter);
+      res.send(result);
+    });
 
     // Getting All the User
     app.get("/users", verifyJWT, async (req, res) => {
