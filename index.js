@@ -231,6 +231,11 @@ async function run() {
       res.send({ admin: isAdmin });
     });
 
+    // get all reviews
+    app.get("/reviews", async (req, res) => {
+      const review = await reviewCollection.find({}).toArray();
+      res.send(review);
+    });
     // Getting The Reviews
     app.get("/review/:email", async (req, res) => {
       const email = req.params.email;
