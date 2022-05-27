@@ -118,7 +118,7 @@ async function run() {
     });
 
     // Getting a single tool from db
-    app.get("/purchase/:id", async (req, res) => {
+    app.get("/purchase/:id", verifyJWT, async (req, res) => {
       const toolId = req.params.id;
       const query = { _id: ObjectId(toolId) };
       const tool = await toolCollection.findOne(query);
@@ -189,6 +189,12 @@ async function run() {
     // Getting All the User
     app.get("/users", verifyJWT, async (req, res) => {
       const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+    // Getting Specific User
+    app.get("/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const users = await userCollection.findOne({ email: email });
       res.send(users);
     });
 
