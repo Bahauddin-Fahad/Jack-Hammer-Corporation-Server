@@ -245,7 +245,7 @@ async function run() {
     app.get("/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email: email });
-      const isAdmin = user.role === "admin";
+      const isAdmin = user?.role === "admin";
       res.send({ admin: isAdmin });
     });
 
@@ -275,6 +275,7 @@ async function run() {
           $set: {
             comment: review.comment,
             rating: review.rating,
+            img: review.img,
           },
         };
         const result = await reviewCollection.updateOne(
