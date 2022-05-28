@@ -72,26 +72,8 @@ async function run() {
       res.send(result);
     });
 
-    // Updating Payment in Order Collection
-    app.patch("/order/:id", verifyJWT, async (req, res) => {
-      const orderId = req.params.id;
-      const payment = req.body;
-      const filter = { _id: ObjectId(orderId) };
-      const updatedDoc = {
-        $set: {
-          paid: true,
-          status: true,
-          transactionId: payment.transactionId,
-        },
-      };
-      const result = await paymentCollection.insertOne(payment);
-      const updateOrder = await orderCollection.updateOne(filter, updatedDoc);
-
-      res.send(updateOrder);
-    });
-
     //Update Quantity Of Tool
-    app.put("/tool/:id", async (req, res) => {
+    app.put("/tool/:id", verifyJWT, async (req, res) => {
       const toolId = req.params.id;
       const newAvailableQuantity = req.body;
       const filter = { _id: ObjectId(toolId) };
@@ -125,13 +107,15 @@ async function run() {
       res.send(tool);
     });
 
-    app.get("/get/orders", async (req, res) => {
+    // Get all the orders
+    app.get("/get/orders", verifyJWT, async (req, res) => {
       const query = {};
       const cursor = orderCollection.find(query);
       const orders = await cursor.toArray();
       res.send(orders);
     });
-    // Get All the Orders
+
+    // Get All the Orders with email
     app.get("/orders", verifyJWT, async (req, res) => {
       const userEmail = req.query.email;
       const query = { email: userEmail };
@@ -149,7 +133,7 @@ async function run() {
     });
 
     //Add a Order To DB
-    app.post("/order", async (req, res) => {
+    app.post("/order", verifyJWT, async (req, res) => {
       const orderDetails = req.body;
       const query = {
         name: orderDetails.name,
@@ -164,8 +148,26 @@ async function run() {
       return res.send({ success: true, result });
     });
 
+    // Updating Payment in Order Collection
+    app.patch("/order/:id", verifyJWT, async (req, res) => {
+      const orderId = req.params.id;
+      const payment = req.body;
+      const filter = { _id: ObjectId(orderId) };
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          status: true,
+          transactionId: payment.transactionId,
+        },
+      };
+      const result = await paymentCollection.insertOne(payment);
+      const updateOrder = await orderCollection.updateOne(filter, updatedDoc);
+
+      res.send(updateOrder);
+    });
+
     //Shift the Order
-    app.patch("/shift/order/:id", async (req, res) => {
+    app.patch("/order/shift/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const updatedDoc = {
@@ -179,7 +181,7 @@ async function run() {
     });
 
     //Cancel order by admin
-    app.delete("/cancel/order/:id", verifyJWT, async (req, res) => {
+    app.delete("/order/cancel/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const result = await orderCollection.deleteOne(filter);
@@ -191,8 +193,9 @@ async function run() {
       const users = await userCollection.find().toArray();
       res.send(users);
     });
+
     // Getting Specific User
-    app.get("/user/:email", async (req, res) => {
+    app.get("/user/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const users = await userCollection.findOne({ email: email });
       res.send(users);
@@ -213,7 +216,7 @@ async function run() {
         options
       );
       const accessToken = jwt.sign(filter, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1d",
+        expiresIn: "20d",
       });
       res.send({ result, accessToken });
     });
@@ -229,8 +232,17 @@ async function run() {
       res.send(result);
     });
 
+    //Remove User by admin
+    app.delete("/user/:email", verifyJWT, verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+      console.log("email", email);
+      const filter = { email: email };
+      const result = await userCollection.deleteOne(filter);
+      res.send(result);
+    });
+
     // Getting an Admin
-    app.get("/admin/:email", async (req, res) => {
+    app.get("/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email: email });
       const isAdmin = user.role === "admin";
@@ -249,6 +261,7 @@ async function run() {
       res.send(review);
     });
 
+    // Add new Review
     app.put("/review/:email", async (req, res) => {
       const email = req.params.email;
       const review = req.body;
